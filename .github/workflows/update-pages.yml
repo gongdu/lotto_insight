@@ -1,0 +1,104 @@
+name: Update lottery data and deploy Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 11,12 * * 4'
+    - cron: '17 12,13,14 * * 6'
+    - cron: '17 0 * * 0'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: lottoinsight-pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: automation/requirements.txt
+
+      - name: Install collector dependencies
+        run: python -m pip install -r automation/requirements.txt
+
+      - name: Verify seed database
+        run: python verify.py
+
+      - name: Rebuild working database from seed and committed round files
+        run: |
+          mkdir -p .runtime
+          cp data/seed/lotto_app.db .runtime/lotto_app.db
+          python automation/apply_site_updates.py --db .runtime/lotto_app.db --site public
+
+      - name: Collect missing official rounds
+        env:
+          LOTTO_DB: .runtime/lotto_app.db
+        run: python automation/updater.py --max-rounds 12 | tee .runtime/update-result.json
+
+      - name: Test parsers and static round sync
+        working-directory: automation
+        run: |
+          python test_updater.py
+          python test_static_sync.py
+
+      - name: Export static GitHub Pages data
+        run: >-
+          python automation/export_pages.py
+          --db .runtime/lotto_app.db
+          --seed-db data/seed/lotto_app.db
+          --site public
+          --publish-db
+
+      - name: Verify runtime database
+        run: |
+          python - <<'PY'
+          import sqlite3
+          c=sqlite3.connect('.runtime/lotto_app.db')
+          result=c.execute('PRAGMA integrity_check').fetchone()[0]
+          print('integrity_check:', result)
+          assert result == 'ok'
+          print('states:', dict(c.execute('SELECT dataset,latest_round FROM sync_state')))
+          PY
+
+      - name: Commit new round JSON files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data public/manifest.json public/latest.json public/health.json
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "data: update lottery results [skip ci]"
+            git push
+          fi
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
