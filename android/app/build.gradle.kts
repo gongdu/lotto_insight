@@ -13,7 +13,11 @@ android {
         versionCode = 2
         versionName = "2.0.0"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        buildConfigField("String", "PAGES_BASE_URL", "\"\"")
+        buildConfigField(
+        "String",
+        "PAGES_BASE_URL",
+        "\"https://gongdu.github.io/lotto_insight\""
+        )
     }
     buildTypes {
         getByName("debug") { manifestPlaceholders["usesCleartextTraffic"] = "true" }
