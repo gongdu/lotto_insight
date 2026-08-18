@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LottoInsight Data</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;max-width:760px;margin:48px auto;padding:0 20px;line-height:1.6}
+    .card{border:1px solid #ddd;border-radius:14px;padding:20px;margin:16px 0}
+    code{background:#f5f5f5;padding:2px 6px;border-radius:6px}
+    .muted{color:#666}
+  </style>
+</head>
+<body>
+  <h1>LottoInsight Data</h1>
+  <p class="muted">Android 앱용 정적 데이터 배포 페이지입니다.</p>
+  <div class="card" id="status">데이터 상태를 불러오는 중...</div>
+  <p><a href="manifest.json">manifest.json</a> · <a href="latest.json">latest.json</a> · <a href="health.json">health.json</a> · <a href="downloads/lotto_app.db">lotto_app.db</a></p>
+<script>
+fetch('manifest.json?t='+Date.now(), {cache:'no-store'}).then(r=>r.json()).then(m=>{
+  const d=m.datasets;
+  document.getElementById('status').innerHTML =
+    `<b>마지막 생성:</b> ${m.generated_at}<br>`+
+    `<b>로또:</b> ${d.lotto.latest_round}회 / <b>판매점:</b> ${d.lotto_stores.latest_round}회<br>`+
+    `<b>연금복권:</b> ${d.pension.latest_round}회 / <b>판매점:</b> ${d.pension_stores.latest_round}회`;
+}).catch(e=>document.getElementById('status').textContent='상태 확인 실패: '+e);
+</script>
+</body>
+</html>
