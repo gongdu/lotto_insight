@@ -72,11 +72,13 @@ jobs:
           print('states:', dict(c.execute('SELECT dataset,latest_round FROM sync_state')))
           PY
 
-      - name: Commit new round JSON files
+      - name: Commit generated Pages data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data public/manifest.json public/latest.json public/health.json
+      
+          git add -A -- public
+      
           if git diff --cached --quiet; then
             echo "No data changes to commit."
           else
